@@ -373,6 +373,9 @@ void			InitLockfreeStack()
 ///////////////////////////////////////////////////////////////////////////////////////////////
 void			TestLockfreeStack()
 {
+	long		lUseTPS		= 0;
+	long		lAllocTPS	= 0;
+
 	for (int iCnt = 0; iCnt < dfTHREAD_MAX; iCnt++)
 	{
 		hThread[iCnt] = (HANDLE)_beginthreadex(
@@ -389,6 +392,8 @@ void			TestLockfreeStack()
 	{
 		lInTPS = lInCounter;
 		lOutTPS = lOutCounter;
+		lUseTPS = g_LockfreeStack.GetUseSize();
+		lAllocTPS = lAllocTPS > g_LockfreeStack.GetAllocSize() ? lAllocTPS : g_LockfreeStack.GetAllocSize();
 
 		lInCounter = 0;
 		lOutCounter = 0;
@@ -401,9 +406,11 @@ void			TestLockfreeStack()
 		wprintf(L"---------------------------------------------------------------------\n\n");
 		wprintf(L"Push  TPS		: %ld\n", lInTPS);
 		wprintf(L"Pop   TPS		: %ld\n", lOutTPS);
-		wprintf(L"Size  TPS		: %ld\n", g_LockfreeStack.GetUseSize());
+		wprintf(L"Size  TPS		: %ld\n", lUseTPS);
+		wprintf(L"Alloc TPS		: %ld\n", lAllocTPS);
 		wprintf(L"---------------------------------------------------------------------\n\n\n");
-		if (g_LockfreeStack.GetUseSize() > (dfTHREAD_MAX * dfTHREAD_ALLOC))
+		if ((g_LockfreeStack.GetUseSize() > (dfTHREAD_MAX * dfTHREAD_ALLOC)) ||
+			(g_LockfreeStack.GetAllocSize() > (dfTHREAD_MAX * dfTHREAD_ALLOC)))
 			CCrashDump::Crash();
 
 		Sleep(999);
