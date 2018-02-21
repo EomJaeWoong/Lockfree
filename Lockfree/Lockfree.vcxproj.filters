@@ -39,6 +39,9 @@
     <ClInclude Include="LockfreeStack.h">
       <Filter>소스 파일</Filter>
     </ClInclude>
+    <ClInclude Include="LockfreeQueue.h">
+      <Filter>소스 파일</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">

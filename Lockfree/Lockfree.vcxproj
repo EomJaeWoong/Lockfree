@@ -145,6 +145,7 @@
   <ItemGroup>
     <ClInclude Include="APIHook.h" />
     <ClInclude Include="CrashDump.h" />
+    <ClInclude Include="LockfreeQueue.h" />
     <ClInclude Include="LockfreeStack.h" />
     <ClInclude Include="main.h" />
     <ClInclude Include="MemoryPool.h" />

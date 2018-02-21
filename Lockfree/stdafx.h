@@ -31,4 +31,5 @@
 #include "CrashDump.h"
 #include "MemoryPool.h"
 #include "LockfreeStack.h"
+#include "LockfreeQueue.h"
 #include "main.h"
