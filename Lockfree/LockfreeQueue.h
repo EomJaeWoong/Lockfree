@@ -88,32 +88,34 @@ public :
 		st_END_NODE		stCloneTailNode;
 		st_NODE			*pNextTail;
 
+		__int64			iUniqueNumTail = InterlockedIncrement64((LONG64 *)&_iUniqueNumTail);
+
 		//////////////////////////////////////////////////////////////////////
 		// 데이터 노드 생성
 		//////////////////////////////////////////////////////////////////////
-		st_NODE			*pNode			= _pQueuePool->Alloc();
-		pNode->Data						= Data;
-		pNode->pNext					= nullptr;
-
-		__int64 iUniqueNumTail			= InterlockedIncrement64((LONG64 *)&_iUniqueNumTail);
+		st_NODE			*pNode = _pQueuePool->Alloc();
+		pNode->Data = Data;
+		pNode->pNext = nullptr;
 
 		while (1)
 		{
 			//////////////////////////////////////////////////////////////////
 			// Tail 저장
 			//////////////////////////////////////////////////////////////////
-			stCloneTailNode.iUniqueNum	= _pTail->iUniqueNum;
-			stCloneTailNode.pEndNode	= _pTail->pEndNode;
+			stCloneTailNode.iUniqueNum = _pTail->iUniqueNum;
+			stCloneTailNode.pEndNode = _pTail->pEndNode;
 
 			//////////////////////////////////////////////////////////////////
 			// Tail의 Next 저장
 			//////////////////////////////////////////////////////////////////
-			pNextTail					= stCloneTailNode.pEndNode->pNext;
+			pNextTail = stCloneTailNode.pEndNode->pNext;
 
 			//////////////////////////////////////////////////////////////////
 			// Tail 다음이 NULL이면(Tail 다음값을 비교해서)
 			// Node를 붙이고
-			// Tail을 밀어준다 (같지 않아도 다른 곳에서 밀어준다)
+			// Tail을 밀어준다 
+			//
+			// Tail이 밀리지 않아도 다른 곳(다른 쓰레드의 Put, Get에서 밀어준다)
 			//////////////////////////////////////////////////////////////////
 			if (nullptr == pNextTail)
 			{
@@ -126,20 +128,30 @@ public :
 					InterlockedCompareExchange128(
 						(LONG64 *)_pTail,
 						iUniqueNumTail,
-						(LONG64)pNode,
+						(LONG64)stCloneTailNode.pEndNode->pNext,
 						(LONG64 *)&stCloneTailNode
 						);
 					break;
 				}
 			}
+		
 
+			//////////////////////////////////////////////////////////////////
+			// next가 있으면 일단 밀어줌
+			// 
+			// Tail이 바뀌었기 때문에 UniqueNum을 올려줌
+			//////////////////////////////////////////////////////////////////
 			else
+			{
 				InterlockedCompareExchange128(
-				(LONG64 *)_pTail, 
-				iUniqueNumTail, 
-				(LONG64)pNextTail, 
-				(LONG64 *)&stCloneTailNode
-				);
+					(LONG64 *)_pTail,
+					iUniqueNumTail,
+					(LONG64)stCloneTailNode.pEndNode->pNext,
+					(LONG64 *)&stCloneTailNode
+					);
+
+				iUniqueNumTail = InterlockedIncrement64((LONG64 *)&_iUniqueNumTail);
+			}
 		}
 
 		InterlockedIncrement((long *)&_lUseSize);
@@ -159,63 +171,62 @@ public :
 
 		__int64			iUniqueNumHead = InterlockedIncrement64((LONG64 *)&_iUniqueNumHead);
 
-		//////////////////////////////////////////////////////////////////////
-		// 비었는지 확인
-		//////////////////////////////////////////////////////////////////////
-		if (isEmpty())
-		{
-			pOutData = nullptr;
-			return false;
-		}
-
-		InterlockedDecrement((long *)&_lUseSize);
-
+		InterlockedDecrement((long *)&_lUseSize);	
+		
 		while (1)
 		{
 			//////////////////////////////////////////////////////////////////
 			// Head 저장
 			//////////////////////////////////////////////////////////////////
-			stCloneHeadNode.iUniqueNum	= _pHead->iUniqueNum;
-			stCloneHeadNode.pEndNode	= _pHead->pEndNode;
-
-
-			//////////////////////////////////////////////////////////////////
-			// Head의 Next 저장
-			//////////////////////////////////////////////////////////////////
-			pNextHead					= stCloneHeadNode.pEndNode->pNext;
-
+			stCloneHeadNode.iUniqueNum = _pHead->iUniqueNum;
+			stCloneHeadNode.pEndNode = _pHead->pEndNode;
 
 			//////////////////////////////////////////////////////////////////
 			// Tail 저장
 			//////////////////////////////////////////////////////////////////
-			stCloneTailNode.iUniqueNum	= _pTail->iUniqueNum;
-			stCloneTailNode.pEndNode	= _pTail->pEndNode;
+			stCloneTailNode.iUniqueNum = _pTail->iUniqueNum;
+			stCloneTailNode.pEndNode = _pTail->pEndNode;
 
-			/////////////////////////////////////////////////////////////////
-			// Queue가 비었을 때
-			/////////////////////////////////////////////////////////////////
-			if (stCloneHeadNode.pEndNode == stCloneTailNode.pEndNode)
+			//////////////////////////////////////////////////////////////////
+			// Head의 Next 저장
+			//////////////////////////////////////////////////////////////////
+			pNextHead = stCloneHeadNode.pEndNode->pNext;
+
+			//////////////////////////////////////////////////////////////////
+			// 비었는지 확인
+			//////////////////////////////////////////////////////////////////
+			if (isEmpty())
 			{
-				if (pNextHead == NULL)
-					return false;
+				pOutData = nullptr;
+				return false;
 			}
 
 			//////////////////////////////////////////////////////////////////
-			// tail뒤에 데이터가 있으면 밀어주기
+			// tail뒤에 Node가 있으면 밀어주기
 			//////////////////////////////////////////////////////////////////
-			if (nullptr != (stCloneTailNode.pEndNode->pNext))
+			else if (nullptr != (stCloneTailNode.pEndNode->pNext))
 			{
 				__int64 iUniqueNumTail = InterlockedIncrement64((LONG64 *)&_iUniqueNumTail);
 				InterlockedCompareExchange128(
 					(LONG64 *)_pTail,
-					iUniqueNumTail, 
+					iUniqueNumTail,
 					(LONG64)stCloneTailNode.pEndNode->pNext,
 					(LONG64 *)&stCloneTailNode
 					);
 			}
 
 			//////////////////////////////////////////////////////////////////
+			// Node가 있을 경우
+			// Head값을 비교하여 바꿔줌
 			//
+			// 노드가 없다고 나오는데 
+			// 이 구간에서 밑의 경우가 있으니 체크해 줌
+			// (Node가 있지만 비어있다고 나오는 상태)
+			//  ---      ---
+			// |   | -> |   |
+			//  ---      ---
+			//  ^ ^
+			//  H T
 			//////////////////////////////////////////////////////////////////
 			else
 			{
@@ -234,8 +245,8 @@ public :
 					}
 				}
 			}
-		
 		}
+		return true;
 	}
 
 

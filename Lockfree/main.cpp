@@ -444,7 +444,8 @@ unsigned __stdcall			LockfreeQueueThread(LPVOID pParam)
 		///////////////////////////////////////////////////////////////////////////////////////
 		for (int iCnt = 0; iCnt < dfTHREAD_ALLOC; iCnt++)
 		{
-			g_LockfreeQueue.Get(&pDataArray[iCnt]);
+			if(!g_LockfreeQueue.Get(&pDataArray[iCnt]))
+				CCrashDump::Crash();
 			InterlockedIncrement((long *)&lOutCounter);
 		}
 
