@@ -56,6 +56,8 @@ DWORD							dwThreadID;
 
 
 
+BOOL							g_bShutdown;
+
 /*===========================================================================================*/
 
 
@@ -74,7 +76,7 @@ unsigned __stdcall				MemoryPoolThread(void *pParam)
 {
 	st_TEST_DATA *pDataArray[dfTHREAD_ALLOC];
 
-	while (1){
+	while (!g_bShutdown){
 		///////////////////////////////////////////////////////////////////////////////////////
 		// Alloc (10000개)
 		///////////////////////////////////////////////////////////////////////////////////////
@@ -83,6 +85,8 @@ unsigned __stdcall				MemoryPoolThread(void *pParam)
 			pDataArray[iCnt] = g_MemoryPool.Alloc();
 			InterlockedIncrement((long *)&lOutCounter);
 		}
+
+		Sleep(10);
 
 		///////////////////////////////////////////////////////////////////////////////////////
 		// 0x0000000055555555 이 맞는지 확인
@@ -148,7 +152,7 @@ unsigned __stdcall				MemoryPoolThread(void *pParam)
 				CCrashDump::Crash();
 		}
 
-
+		Sleep(10);
 
 		///////////////////////////////////////////////////////////////////////////////////////
 		// Free
@@ -157,8 +161,10 @@ unsigned __stdcall				MemoryPoolThread(void *pParam)
 		{
 			g_MemoryPool.Free(pDataArray[iCnt]);
 			InterlockedIncrement((long *)&lInCounter);
-		}
+		}	
 	}
+
+	return 0;
 }
 
 
@@ -212,24 +218,15 @@ void							TestMemoryPool()
 			);
 	}
 
+	wprintf(L"=====================================================================\n");
+	wprintf(L"                        MemoryPool Testing...                        \n");
+	wprintf(L"=====================================================================\n\n");
+
 	while (1)
 	{
-		lInTPS = lInCounter;
-		lOutTPS = lOutCounter;
+		wprintf(L"Use Count		: %d, ", g_MemoryPool.GetAllocCount());
+		wprintf(L"Block Count		: %d\n", g_MemoryPool.GetBlockCount());
 
-		lInCounter = 0;
-		lOutCounter = 0;
-
-		system("cls");
-		wprintf(L"=====================================================================\n");
-		wprintf(L"                        MemoryPool Testing...                        \n");
-		wprintf(L"=====================================================================\n\n");
-
-		wprintf(L"---------------------------------------------------------------------\n\n");
-		wprintf(L"Alloc TPS		: %ld\n", lOutTPS);
-		wprintf(L"Free  TPS		: %ld\n", lInTPS);
-		wprintf(L"Alloc TPS		: %ld\n", g_MemoryPool.GetAllocCount());
-		wprintf(L"---------------------------------------------------------------------\n\n\n");
 		if (g_MemoryPool.GetAllocCount() > (dfTHREAD_MAX * dfTHREAD_ALLOC))
 			CCrashDump::Crash();
 
@@ -260,9 +257,12 @@ unsigned __stdcall			LockfreeStackThread(LPVOID pParam)
 		///////////////////////////////////////////////////////////////////////////////////////
 		for (int iCnt = 0; iCnt < dfTHREAD_ALLOC; iCnt++)
 		{
+			InterlockedIncrement(&lOutCounter);
+
 			g_LockfreeStack.Pop(&pDataArray[iCnt]);
-			InterlockedIncrement((long *)&lOutCounter);
 		}
+
+		Sleep(5);
 
 		///////////////////////////////////////////////////////////////////////////////////////
 		// 0x0000000055555555 이 맞는지 확인
@@ -273,7 +273,6 @@ unsigned __stdcall			LockfreeStackThread(LPVOID pParam)
 				(0 != pDataArray[iCnt]->lCount))
 				CCrashDump::Crash();
 		}
-
 
 		///////////////////////////////////////////////////////////////////////////////////////
 		// Interlocked + 1 (Data + 1 / Count + 1)
@@ -288,7 +287,7 @@ unsigned __stdcall			LockfreeStackThread(LPVOID pParam)
 		///////////////////////////////////////////////////////////////////////////////////////
 		// 약간 대기
 		///////////////////////////////////////////////////////////////////////////////////////
-		Sleep(dfSLEEP);
+		//Sleep(dfSLEEP);
 
 
 		///////////////////////////////////////////////////////////////////////////////////////
@@ -315,11 +314,10 @@ unsigned __stdcall			LockfreeStackThread(LPVOID pParam)
 		///////////////////////////////////////////////////////////////////////////////////////
 		// 약간 대기
 		///////////////////////////////////////////////////////////////////////////////////////
-		Sleep(dfSLEEP);
-
+		//Sleep(dfSLEEP);
 
 		///////////////////////////////////////////////////////////////////////////////////////
-		// 0x0000000055555555 / 0 이 맞는지 확인
+		// 0x0000000055555555 이 맞는지 확인
 		///////////////////////////////////////////////////////////////////////////////////////
 		for (int iCnt = 0; iCnt < dfTHREAD_ALLOC; iCnt++)
 		{
@@ -328,7 +326,7 @@ unsigned __stdcall			LockfreeStackThread(LPVOID pParam)
 				CCrashDump::Crash();
 		}
 
-
+		Sleep(5);
 
 		///////////////////////////////////////////////////////////////////////////////////////
 		// Free
@@ -336,7 +334,7 @@ unsigned __stdcall			LockfreeStackThread(LPVOID pParam)
 		for (int iCnt = 0; iCnt < dfTHREAD_ALLOC; iCnt++)
 		{
 			g_LockfreeStack.Push(pDataArray[iCnt]);
-			InterlockedIncrement((long *)&lInCounter);
+			InterlockedIncrement(&lInCounter);
 		}
 	}
 }
@@ -379,8 +377,8 @@ void			InitLockfreeStack()
 ///////////////////////////////////////////////////////////////////////////////////////////////
 void			TestLockfreeStack()
 {
-	long		lUseTPS		= 0;
-	long		lAllocTPS	= 0;
+	long		lUseTPS = 0;
+	long		lAllocTPS = 0;
 
 	for (int iCnt = 0; iCnt < dfTHREAD_MAX; iCnt++)
 	{
@@ -394,6 +392,10 @@ void			TestLockfreeStack()
 			);
 	}
 
+	wprintf(L"=====================================================================\n");
+	wprintf(L"                       Lockfree Stack Testing...                     \n");
+	wprintf(L"=====================================================================\n\n");
+
 	while (1)
 	{
 		lInTPS = lInCounter;
@@ -404,23 +406,18 @@ void			TestLockfreeStack()
 		lInCounter = 0;
 		lOutCounter = 0;
 
-		system("cls");
-		wprintf(L"=====================================================================\n");
-		wprintf(L"                       Lockfree Stack Testing...                     \n");
-		wprintf(L"=====================================================================\n\n");
+		wprintf(L"Push : %8ld, ", lInTPS);
+		wprintf(L"Pop : %8ld, ", lOutTPS);
+		wprintf(L"Size : %8ld, ", lUseTPS);
+		wprintf(L"Alloc	: %8ld\n", lAllocTPS);
 
-		wprintf(L"---------------------------------------------------------------------\n\n");
-		wprintf(L"Push  TPS		: %ld\n", lInTPS);
-		wprintf(L"Pop   TPS		: %ld\n", lOutTPS);
-		wprintf(L"Size  TPS		: %ld\n", lUseTPS);
-		wprintf(L"Alloc TPS		: %ld\n", lAllocTPS);
-		wprintf(L"---------------------------------------------------------------------\n\n\n");
 		if ((g_LockfreeStack.GetUseSize() > (dfTHREAD_MAX * dfTHREAD_ALLOC)) ||
 			(g_LockfreeStack.GetAllocSize() > (dfTHREAD_MAX * dfTHREAD_ALLOC)))
 			CCrashDump::Crash();
 
 		Sleep(999);
 	}
+
 
 }
 /*-------------------------------------------------------------------------------------------*/
@@ -439,6 +436,8 @@ unsigned __stdcall			LockfreeQueueThread(LPVOID pParam)
 	st_TEST_DATA *pDataArray[dfTHREAD_ALLOC];
 
 	while (1){
+		Sleep(0);
+
 		///////////////////////////////////////////////////////////////////////////////////////
 		// 뽑기
 		///////////////////////////////////////////////////////////////////////////////////////
@@ -448,6 +447,8 @@ unsigned __stdcall			LockfreeQueueThread(LPVOID pParam)
 				CCrashDump::Crash();
 			InterlockedIncrement((long *)&lOutCounter);
 		}
+
+		Sleep(20);
 
 		///////////////////////////////////////////////////////////////////////////////////////
 		// 0x0000000055555555 이 맞는지 확인
@@ -459,6 +460,7 @@ unsigned __stdcall			LockfreeQueueThread(LPVOID pParam)
 				CCrashDump::Crash();
 		}
 
+		
 
 		///////////////////////////////////////////////////////////////////////////////////////
 		// Interlocked + 1 (Data + 1 / Count + 1)
@@ -473,7 +475,7 @@ unsigned __stdcall			LockfreeQueueThread(LPVOID pParam)
 		///////////////////////////////////////////////////////////////////////////////////////
 		// 약간 대기
 		///////////////////////////////////////////////////////////////////////////////////////
-		Sleep(dfSLEEP);
+		//Sleep(dfSLEEP);
 
 
 		///////////////////////////////////////////////////////////////////////////////////////
@@ -500,8 +502,9 @@ unsigned __stdcall			LockfreeQueueThread(LPVOID pParam)
 		///////////////////////////////////////////////////////////////////////////////////////
 		// 약간 대기
 		///////////////////////////////////////////////////////////////////////////////////////
-		Sleep(dfSLEEP);
+		//Sleep(dfSLEEP);
 
+		
 
 		///////////////////////////////////////////////////////////////////////////////////////
 		// 0x0000000055555555 / 0 이 맞는지 확인
@@ -513,7 +516,7 @@ unsigned __stdcall			LockfreeQueueThread(LPVOID pParam)
 				CCrashDump::Crash();
 		}
 
-
+		Sleep(20);
 
 		///////////////////////////////////////////////////////////////////////////////////////
 		// Free
@@ -579,6 +582,11 @@ void			TestLockfreeQueue()
 			);
 	}
 
+	system("cls");
+	wprintf(L"=====================================================================\n");
+	wprintf(L"                       Lockfree Queue Testing...                     \n");
+	wprintf(L"=====================================================================\n\n");
+
 	while (1)
 	{
 		lInTPS = lInCounter;
@@ -589,17 +597,11 @@ void			TestLockfreeQueue()
 		lInCounter = 0;
 		lOutCounter = 0;
 
-		system("cls");
-		wprintf(L"=====================================================================\n");
-		wprintf(L"                       Lockfree Queue Testing...                     \n");
-		wprintf(L"=====================================================================\n\n");
+		wprintf(L"Put : %8ld, ", lInTPS);
+		wprintf(L"Get : %8ld, ", lOutTPS);
+		wprintf(L"Size : %8ld, ", lUseTPS);
+		wprintf(L"Alloc : %8ld\n", lAllocTPS);
 
-		wprintf(L"---------------------------------------------------------------------\n\n");
-		wprintf(L"Put   TPS		: %ld\n", lInTPS);
-		wprintf(L"Get   TPS		: %ld\n", lOutTPS);
-		wprintf(L"Size  TPS		: %ld\n", lUseTPS);
-		wprintf(L"Alloc TPS		: %ld\n", lAllocTPS);
-		wprintf(L"---------------------------------------------------------------------\n\n\n");
 		if ((g_LockfreeQueue.GetUseSize() > (dfTHREAD_MAX * dfTHREAD_ALLOC)) ||
 			(g_LockfreeQueue.GetAllocSize() > (dfTHREAD_MAX * dfTHREAD_ALLOC)))
 			CCrashDump::Crash();
@@ -618,6 +620,8 @@ int				_tmain(int argc, _TCHAR* argv[])
 	CCrashDump::CCrashDump();
 
 	char		chSelectModel;
+	
+	g_bShutdown = FALSE;
 
 	do
 	{
@@ -651,6 +655,11 @@ int				_tmain(int argc, _TCHAR* argv[])
 		case '3':
 			InitLockfreeQueue();
 			TestLockfreeQueue();
+			break;
+
+		case 'q' :
+		case 'Q' :
+			g_bShutdown = TRUE;
 			break;
 
 		default:
